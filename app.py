@@ -8,11 +8,12 @@ from ModelosPrediccion.LSTM import ejecutar_lstm
 from ModelosPrediccion.MLP import ejecutar_mlp
 from ModelosPrediccion.RBF_SVR import ejecutar_rbf_svr
 from ModelosPrediccion.SVR import ejecutar_svr
+from ModelosPrediccion.random_forest import ejecutar_random_forest
 
 # Importar preprocesamiento
 from ModelosPrediccion.preprocessing import preprocessing
 
-modelos_disponibles = ["LSTM", "MLP", "RBF + SVR", "SVR"]
+modelos_disponibles = ["LSTM", "MLP", "RBF + SVR", "SVR", "RF"]
 instrumentos_financieros = ['BVN', 'SCCO', 'GOLD', 'BHP']
 
 @st.cache_data
@@ -20,7 +21,7 @@ def obtener_datos(instrumento, start, end):
     df = yf.download(instrumento, start=start, end=end)
     return df
 
-st.title("Evaluación de Modelos de Predicción de Stock")
+st.title("SISTEMA DE PREDICCIÓN DE PRECIOS DE INSTRUMENTOS FINANCIEROS MINEROS USANDO MODELOS REGRESORES DE MACHINE LEARNING")
 
 modelo_seleccionado = st.selectbox("Seleccione el modelo para la evaluación", modelos_disponibles)
 instrumento_seleccionado = st.selectbox("Seleccione el instrumento financiero", instrumentos_financieros)
@@ -48,6 +49,7 @@ if st.button("Evaluar"):
 
             if modelo_seleccionado == "LSTM":
                 mse, rmse, mape, fig_pred, ultima_prediccion= ejecutar_lstm(df_preprocessed)
+
             elif modelo_seleccionado == "MLP":
                 mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_mlp(df_preprocessed)
 
@@ -56,6 +58,10 @@ if st.button("Evaluar"):
 
             elif modelo_seleccionado == "SVR":
                 mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_svr(df_preprocessed)
+            
+            elif modelo_seleccionado == "RF":
+                mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_random_forest(df_preprocessed)
+            
 
             st.plotly_chart(fig_pred)
 
