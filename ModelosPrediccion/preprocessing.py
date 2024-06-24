@@ -90,7 +90,8 @@ def preprocessing(df):
     silver_df = yf.download('SI=F', start=df.index.min(), end=df.index.max())
     df['Precio Plata'] = silver_df['Close']
 
-    # Agregar la columna del precio del día siguiente
+    ##############################
+    # Agregar la columna del precio del día siguiente, para entrenar el modelo con esta variable 
     df['Precio Siguiente'] = df['Close'].shift(-1)
 
     # Gráfico: Comparación del Precio de Cierre con el Precio de la Plata

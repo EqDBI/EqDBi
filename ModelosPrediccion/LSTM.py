@@ -1,157 +1,95 @@
-
-
-# IMPORTING LIBRARIES
-
-
-# Basicos
-import pandas as pd # Manipulación y análisis de datos
-import numpy as np # Operaciones numéricas y algebra lineal
-
-
-from sklearn.preprocessing import MinMaxScaler # Escalado de características a un rango específico
-
-# Evaluacion
-from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error # Métricas de evaluación
-
-# Visualizaciones
-
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 import plotly.graph_objects as go
 
-# RNN: LSTM
-from tensorflow.keras.models import Sequential # type: ignore # Creación de modelos secuenciales de Keras
-from tensorflow.keras.layers import LSTM, Dense # type: ignore # Capas LSTM y densas para redes neuronales
-
-
-from ModelosPrediccion.preprocessing import preprocessing
-
-
-
-
-"""# COMPAÑIA DE MINAS BUENAVENURA SAA (BVN)
-
-## Extracción de datos
-"""
-
-def ejecutar_lstm(df,instrumento_financiero, fecha_inicio, fecha_fin):
-        # Descargar datos históricos de Buenaventura en un rango de fechas específico
-    bvn_df, fig1, fig2, fig3, fig4 = preprocessing(df,instrumento_financiero, fecha_inicio, fecha_fin)
-    
-    """## MODELO: Red Neuronal Recurrente Long Short Term Memory (LSTM)
-
-    Modelado de X e y
-    """
-
-
-    # Seleccionar las columnas que quieres usar como input para el modelo LSTM
-    features = bvn_df[[ 'Precio Anterior',
-                    'Precio Máximo Anterior', 'Precio Mínimo Anterior', 'Precio Apertura Anterior',
-                    'PM_10', 'Middle Band Bollinger', 'Upper Band Bollinger',
-                    'Lower Band Bollinger', 'Precio Plata']].values
+def ejecutar_lstm(df):
+    # Seleccionar las columnas que quieres usar como input para el modelo
+    features = ['Open', 'High', 'Low', 'Close', 'Volume',
+                'PM_10', 'Middle Band Bollinger', 'Upper Band Bollinger',
+                'Lower Band Bollinger', 'Precio Medio', 'Precio Plata']
 
     # Escalar los datos
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_features = scaler.fit_transform(features)
+    scaler_features = MinMaxScaler(feature_range=(0, 1))
+    scaled_features = scaler_features.fit_transform(df[features])
+
+    scaler_target = MinMaxScaler(feature_range=(0, 1))
+    scaled_target = scaler_target.fit_transform(df[['Precio Siguiente']])
 
     # Definir la longitud de la secuencia (número de timesteps)
     timesteps = 60
 
-    # Prepara los datos para la LSTM
-    X = []
-    y = []
+    # Preparar los datos para el modelo
+    X_seq = []
+    y_seq = []
 
+    # Crear las secuencias de datos para las características y el objetivo
     for i in range(timesteps, len(scaled_features)):
-        X.append(scaled_features[i-timesteps:i])
-        y.append(scaled_features[i, 3])  # Prediccion del precio de cierre (Close)
+        # Crear una ventana deslizante de longitud `timesteps` para las características
+        X_seq.append(scaled_features[i-timesteps:i])
+        # Añadir el valor del precio del día siguiente de la columna escalada 'Precio Siguiente' a y_seq
+        y_seq.append(scaled_target[i, 0])
 
-    X, y = np.array(X), np.array(y)
-
-    """Separación en Conjunto de Entrenamiento y Prueba
-
-    """
+    X_seq, y_seq = np.array(X_seq), np.array(y_seq)
 
     # Divide en conjuntos de entrenamiento y prueba
-    split = int(0.8 * len(X))
-    X_train, X_test = X[:split], X[split:]
-    y_train, y_test = y[:split], y[split:]
+    split = int(0.8 * len(X_seq))
+    X_train, X_test = X_seq[:split], X_seq[split:]
+    y_train, y_test = y_seq[:split], y_seq[split:]
 
-    """### Definición y Compilación del Modelo LSTM"""
+    # Definir y entrenar el modelo LSTM
+    model_lstm = Sequential()
+    model_lstm.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+    model_lstm.add(LSTM(units=50))
+    model_lstm.add(Dense(1))
+    model_lstm.compile(optimizer='adam', loss='mean_squared_error')
 
-    # Definición y Compilación del Modelo LSTM
-
-    # Construir el modelo LSTM
-    model = Sequential() # Se inicializa un modelo secuencial
-
-    # Se añade una capa LSTM con 50 unidades, que devuelve secuencias para ser utilizadas en la siguiente capa LSTM
-    # Se especifica la forma de entrada como (número de timesteps, número de características)
-    model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-
-    # Se añade una segunda capa LSTM con 50 unidades, sin devolver secuencias (última capa LSTM)
-    model.add(LSTM(units=50))
-
-    # Se añade una capa densa completamente conectada con una unidad de salida (predicción final)
-    model.add(Dense(1))
-
-    # Compilar el modelo
-    # Se especifica el optimizador 'adam' y la función de pérdida 'mean_squared_error'
-    model.compile(optimizer='adam', loss='mean_squared_error')
-
-    # Entrenar el modelo
-    model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test))
-
-    """Predicciones"""
+    model_lstm.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test))
 
     # Hacer predicciones
-    predictions = model.predict(X_test)
+    predictions_lstm = model_lstm.predict(X_test)
+    predictions_lstm = scaler_target.inverse_transform(predictions_lstm.reshape(-1, 1)).flatten()
+    y_test_lstm = scaler_target.inverse_transform(y_test.reshape(-1, 1)).flatten()
 
-    # Invertir la escala de las predicciones
-    predictions = scaler.inverse_transform(np.concatenate((predictions, np.zeros((predictions.shape[0], scaled_features.shape[1]-1))), axis=1))[:,0]
+    # Asegurarse de que test_dates, predictions_lstm y y_test_lstm tengan la misma longitud
+    test_dates = df.index[-len(predictions_lstm):]
 
-    """Gráfica de las Predicciones y Valores Reales"""
-
-    # Crear un DataFrame para las predicciones y los valores reales
-    predictions_df = pd.DataFrame({
-        'Fecha': bvn_df.index[-len(predictions):],
-        'Predicciones': predictions,
-        'Valores Reales': scaler.inverse_transform(np.concatenate((y_test.reshape(-1, 1), np.zeros((y_test.shape[0], scaled_features.shape[1]-1))), axis=1))[:,0]
+    # Crear un DataFrame para las predicciones y los valores reales en el conjunto de prueba
+    predictions_df_lstm = pd.DataFrame({
+        'Fecha': test_dates,
+        'Predicciones LSTM': predictions_lstm,
+        'Valores Reales': y_test_lstm
     })
 
-    # Graficar las predicciones y los valores reales
-    fig5 = go.Figure()
-
-    # Añadir la línea de Valores Reales
-    fig5.add_trace(go.Scatter(
-        x=predictions_df['Fecha'],
-        y=predictions_df['Valores Reales'],
+    # Graficar las predicciones y los valores reales del conjunto de prueba para LSTM
+    fig_pred = go.Figure()
+    fig_pred.add_trace(go.Scatter(
+        x=predictions_df_lstm['Fecha'],
+        y=predictions_df_lstm['Valores Reales'],
         mode='lines',
         name='Valores Reales'
     ))
-
-    # Añadir la línea de Predicciones
-    fig5.add_trace(go.Scatter(
-        x=predictions_df['Fecha'],
-        y=predictions_df['Predicciones'],
+    fig_pred.add_trace(go.Scatter(
+        x=predictions_df_lstm['Fecha'],
+        y=predictions_df_lstm['Predicciones LSTM'],
         mode='lines',
-        name='Predicciones',
-        line=dict(color='brown')
+        name='Predicciones LSTM',
+        line=dict(color='blue')
     ))
-
-    # Configurar el diseño de la figura
-    fig5.update_layout(
-        title='Predicciones vs Valores Reales del Precio de Cierre',
+    fig_pred.update_layout(
+        title='Predicciones LSTM vs Valores Reales del Precio de Cierre (Conjunto de Prueba)',
         xaxis_title='Fecha',
         yaxis_title='Precio de Cierre',
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         template='plotly_white'
-)
+    )
 
-
-    """### Evaluación del modelo"""
-
-    # Calcular las métricas de evaluación
-    mse = mean_squared_error(predictions_df['Valores Reales'], predictions_df['Predicciones'])
+    # Evaluación del modelo
+    mse = mean_squared_error(y_test_lstm, predictions_lstm)
     rmse = np.sqrt(mse)
-    mape = mean_absolute_percentage_error(predictions_df['Valores Reales'], predictions_df['Predicciones'])
+    mape = mean_absolute_percentage_error(y_test_lstm, predictions_lstm)
 
-    return mse , rmse , mape, fig1, fig2, fig3, fig4, fig5
-
-
+    return mse, rmse, mape, fig_pred, predictions_lstm[-1]

@@ -98,4 +98,4 @@ def ejecutar_mlp(df):
     mape = mean_absolute_percentage_error(y_test_mlp, predictions_mlp)
 
 
-    return mse, rmse, mape, fig_pred
+    return mse, rmse, mape, fig_pred, predictions_mlp[-1]

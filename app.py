@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 import yfinance as yf
+from datetime import timedelta
 
 # Importar modelos
 from ModelosPrediccion.LSTM import ejecutar_lstm
@@ -12,7 +13,7 @@ from ModelosPrediccion.SVR import ejecutar_svr
 from ModelosPrediccion.preprocessing import preprocessing
 
 modelos_disponibles = ["LSTM", "MLP", "RBF + SVR", "SVR"]
-instrumentos_financieros = ['BVN', 'FSM', 'SSCO', 'GOLD', 'AUY', 'GFI', 'HMY']
+instrumentos_financieros = ['BVN', 'SCCO', 'GOLD', 'BHP']
 
 @st.cache_data
 def obtener_datos(instrumento, start, end):
@@ -27,7 +28,8 @@ fecha_inicio = st.date_input("Fecha de inicio", value=datetime(2020, 1, 1))
 fecha_fin = st.date_input("Fecha de fin", value=datetime.today())
 if st.button("Evaluar"):
     if fecha_inicio < fecha_fin:
-        df = obtener_datos(instrumento_seleccionado, fecha_inicio, fecha_fin)
+        today = datetime.today()
+        df = obtener_datos(instrumento_seleccionado, fecha_inicio, today )
 
         if not df.empty:
             st.subheader(f"Datos del stock de {instrumento_seleccionado} desde {fecha_inicio} hasta {fecha_fin}")
@@ -45,15 +47,15 @@ if st.button("Evaluar"):
 
 
             if modelo_seleccionado == "LSTM":
-                mse, rmse, mape, fig_pred = ejecutar_lstm(df_preprocessed)
+                mse, rmse, mape, fig_pred, ultima_prediccion= ejecutar_lstm(df_preprocessed)
             elif modelo_seleccionado == "MLP":
-                mse, rmse, mape, fig_pred = ejecutar_mlp(df_preprocessed)
+                mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_mlp(df_preprocessed)
 
             elif modelo_seleccionado == "RBF + SVR":
-                mse, rmse, mape, fig_pred = ejecutar_rbf_svr(df_preprocessed)
+                mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_rbf_svr(df_preprocessed)
 
             elif modelo_seleccionado == "SVR":
-                mse, rmse, mape, fig_pred = ejecutar_svr(df_preprocessed)
+                mse, rmse, mape, fig_pred, ultima_prediccion = ejecutar_svr(df_preprocessed)
 
             st.plotly_chart(fig_pred)
 
@@ -62,6 +64,13 @@ if st.button("Evaluar"):
             st.write(f"Error Cuadrático Medio (MSE): {mse}")
             st.write(f"Raíz del Error Cuadrático Medio (RMSE): {rmse}")
             st.write(f"Error Absoluto Porcentual Promedio (MAPE): {mape}")
+
+            
+
+            st.subheader("Última predicción del modelo:")
+            today = datetime.today()
+            tomorrow = today + timedelta(days=1)
+            st.write(f"Precio predicho para {tomorrow.strftime('%Y-%m-%d')}: {ultima_prediccion:.2f}")
 
         else:
             st.error("No se encontraron datos para el rango de fechas seleccionado.")

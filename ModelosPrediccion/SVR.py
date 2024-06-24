@@ -97,4 +97,4 @@ def ejecutar_svr(df):
     st.write(f"Error Absoluto Porcentual Promedio (MAPE): {mape}")
 
 
-    return mse, rmse, mape, fig_pred
+    return mse, rmse, mape, fig_pred, y_pred[-1]
